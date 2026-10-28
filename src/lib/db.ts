@@ -1,12 +1,4 @@
 import mongoose from "mongoose";
-import dns from "dns";
-
-// Custom DNS fallback
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4"]);
-} catch (e) {
-  // Ignore if already set or restricted
-}
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -24,9 +16,6 @@ export async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 10000,
-      connectTimeoutMS: 10000,
-      family: 4, // Force IPv4
     };
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongooseInstance) => {
