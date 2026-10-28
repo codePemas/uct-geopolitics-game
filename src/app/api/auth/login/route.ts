@@ -1,37 +1,59 @@
 import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { connectToDatabase } from "@/lib/db";
-import User from "@/models/User";
-
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json(
+        { message: "Email and password are required" },
+        { status: 400 }
+      );
     }
 
-    await connectToDatabase();
+    // Query Neon Postgres for user by email
+    const users = await sql`
+      SELECT * FROM users WHERE email = ${email}
+    `;
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    if (users.length === 0) {
+      return NextResponse.json(
+        { message: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    const isMatch = await bcrypt.compare(password, user.passwordHash);
-    if (!isMatch) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+    const user = users[0];
+
+    // Verify password match
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { message: "Invalid email or password" },
+        { status: 401 }
+      );
     }
 
-    const token = jwt.sign({ userId: user._id, username: user.username }, JWT_SECRET, {
-      expiresIn: "7d",
-    });
-
-    return NextResponse.json({ token, user: { id: user._id, username: user.username, email: user.email } });
+    // Return authenticated user details
+    return NextResponse.json(
+      {
+        message: "Login successful!",
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+        },
+      },
+      { status: 200 }
+    );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Login failed" }, { status: 500 });
+    console.error("Login error:", error);
+    return NextResponse.json(
+      { message: error.message || "Failed to log in" },
+      { status: 500 }
+    );
   }
 }
