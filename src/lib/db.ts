@@ -1,36 +1,14 @@
-import mongoose from "mongoose";
+import { neon } from "@neondatabase/serverless";
 
-const MONGODB_URI = process.env.MONGODB_URI;
+const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!MONGODB_URI) {
-  throw new Error("Please define the MONGODB_URI environment variable inside .env.local");
+if (!DATABASE_URL) {
+  throw new Error("Please define the DATABASE_URL environment variable inside .env.local");
 }
 
-let cached = (global as any).mongoose || { conn: null, promise: null };
+export const sql = neon(DATABASE_URL);
 
+// Compatibility export so existing files importing connectToDatabase don't break
 export async function connectToDatabase() {
-  if (cached.conn) {
-    return cached.conn;
-  }
-
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-      family: 4, // Force IPv4 to prevent serverless DNS resolution timeouts
-      serverSelectionTimeoutMS: 10000,
-    };
-
-    cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongooseInstance) => {
-      return mongooseInstance;
-    });
-  }
-
-  try {
-    cached.conn = await cached.promise;
-  } catch (e) {
-    cached.promise = null;
-    throw e;
-  }
-
-  return cached.conn;
+  return sql;
 }

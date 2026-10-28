@@ -1,28 +1,36 @@
 import { NextResponse } from "next/server";
+import { sql } from "@/lib/db";
 import bcrypt from "bcryptjs";
-import { connectToDatabase } from "@/lib/db";
-import User from "@/models/User";
 
 export async function POST(req: Request) {
   try {
     const { username, email, password } = await req.json();
 
     if (!username || !email || !password) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+      return NextResponse.json({ message: "All fields are required" }, { status: 400 });
     }
 
-    await connectToDatabase();
+    const existingUsers = await sql`
+      SELECT id FROM users WHERE email = ${email} OR username = ${username}
+    `;
 
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    if (existingUser) {
-      return NextResponse.json({ error: "Username or email already exists" }, { status: 400 });
+    if (existingUsers.length > 0) {
+      return NextResponse.json({ message: "User or Email already exists" }, { status: 400 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await User.create({ username, email, passwordHash });
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    return NextResponse.json({ message: "User registered successfully", userId: user._id }, { status: 201 });
+    await sql`
+      INSERT INTO users (username, email, password)
+      VALUES (${username}, ${email}, ${hashedPassword})
+    `;
+
+    return NextResponse.json({ message: "User registered successfully!" }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Registration failed" }, { status: 500 });
+    console.error("Registration error:", error);
+    return NextResponse.json(
+      { message: error.message || "Failed to register user" },
+      { status: 500 }
+    );
   }
 }
