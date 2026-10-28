@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
-// Ensure a games table exists in Neon if it hasn't been created yet
 async function initGamesTable() {
   await sql`
     CREATE TABLE IF NOT EXISTS games (
@@ -19,20 +18,23 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { country, userId } = body;
 
-    // Ensure the table exists
     await initGamesTable();
 
-    // Insert the new game session
     const newGame = await sql`
       INSERT INTO games (user_id, home_country, status)
       VALUES (${userId || null}, ${country || "South Africa"}, 'active')
       RETURNING *;
     `;
 
+    const game = newGame[0];
+
     return NextResponse.json(
       {
         message: "Campaign started successfully!",
-        game: newGame[0],
+        game: {
+          ...game,
+          _id: game.id, // Compatibility alias for frontend code expecting MongoDB _id
+        },
       },
       { status: 201 }
     );
