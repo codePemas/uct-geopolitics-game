@@ -1,11 +1,36 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 
+async function ensureTableColumns() {
+  await sql`
+    CREATE TABLE IF NOT EXISTS games (
+      id SERIAL PRIMARY KEY,
+      user_id INT,
+      home_country VARCHAR(255) NOT NULL,
+      status VARCHAR(50) DEFAULT 'active',
+      turn INT DEFAULT 1,
+      gold INT DEFAULT 1200,
+      manpower INT DEFAULT 10000,
+      territories JSONB,
+      logs JSONB,
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
+  // Safely add missing columns if table existed prior
+  try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS turn INT DEFAULT 1;`; } catch (_) {}
+  try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS gold INT DEFAULT 1200;`; } catch (_) {}
+  try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS manpower INT DEFAULT 10000;`; } catch (_) {}
+  try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS territories JSONB;`; } catch (_) {}
+  try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS logs JSONB;`; } catch (_) {}
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
+    await ensureTableColumns();
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id;
 
@@ -13,7 +38,9 @@ export async function GET(
       return NextResponse.json({ message: "Invalid game ID" }, { status: 400 });
     }
 
-    const games = await sql`SELECT * FROM games WHERE id = ${parseInt(id, 10)}`;
+    const numericId = parseInt(id, 10);
+    const games = await sql`SELECT * FROM games WHERE id = ${numericId}`;
+
     if (games.length === 0) {
       return NextResponse.json({ message: "Game session not found" }, { status: 404 });
     }
@@ -25,7 +52,7 @@ export async function GET(
       gameId: game.id,
       homeCountry: game.home_country,
       status: game.status || "active",
-      turn: game.turn || 1,
+      turn: game.turn ?? 1,
       resources: {
         gold: game.gold ?? 1200,
         manpower: game.manpower ?? 10000,
@@ -43,7 +70,8 @@ export async function GET(
 
     return NextResponse.json({ game: gameState }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("GET /api/games/[id] error:", error);
+    return NextResponse.json({ message: error.message || "Server Error" }, { status: 500 });
   }
 }
 
@@ -52,19 +80,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
+    await ensureTableColumns();
     const resolvedParams = await Promise.resolve(params);
     const id = resolvedParams?.id;
     const body = await req.json().catch(() => ({}));
     const { action, fromCountryId, toCountryId } = body;
 
-    const games = await sql`SELECT * FROM games WHERE id = ${parseInt(id, 10)}`;
+    if (!id || isNaN(Number(id))) {
+      return NextResponse.json({ message: "Invalid game ID" }, { status: 400 });
+    }
+
+    const numericId = parseInt(id, 10);
+    const games = await sql`SELECT * FROM games WHERE id = ${numericId}`;
+
     if (games.length === 0) {
       return NextResponse.json({ message: "Game not found" }, { status: 404 });
     }
 
     const game = games[0];
-    let turn = (game.turn || 1) + 1;
-    let gold = (game.gold ?? 1200) + 200; // Turn income bonus
+    let turn = (game.turn ?? 1) + 1;
+    let gold = (game.gold ?? 1200) + 200;
     let manpower = (game.manpower ?? 10000) + 600;
 
     let territories = game.territories || [
@@ -86,22 +121,29 @@ export async function POST(
         } else if (attacker.strength > defender.strength) {
           defender.owner = "player";
           defender.strength = Math.floor(attacker.strength * 0.7);
-          gold += 350; // Spoils of war
+          gold += 350;
           logs.unshift({ message: `🏆 VICTORY! ${attacker.name} successfully conquered ${defender.name}! Acquired +350 Gold.` });
         } else {
           attacker.strength = Math.max(20, attacker.strength - 40);
-          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by enemy garrison. Attacker forces weakened.` });
+          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by enemy garrison.` });
         }
       }
     } else if (action === "SKIP") {
       logs.unshift({ message: `Turn ${turn}: Consolidated regional defenses, reinforced garrisons, and gathered economic yields.` });
     }
 
-    // Save updated state back into Neon Postgres
+    const territoriesJson = JSON.stringify(territories);
+    const logsJson = JSON.stringify(logs);
+
+    // Update database record safely
     await sql`
       UPDATE games 
-      SET turn = ${turn}, gold = ${gold}, manpower = ${manpower}, territories = ${JSON.stringify(territories)}::jsonb, logs = ${JSON.stringify(logs)}::jsonb
-      WHERE id = ${game.id}
+      SET turn = ${turn}, 
+          gold = ${gold}, 
+          manpower = ${manpower}, 
+          territories = ${territoriesJson}::jsonb, 
+          logs = ${logsJson}::jsonb
+      WHERE id = ${numericId}
     `;
 
     return NextResponse.json({
@@ -117,6 +159,7 @@ export async function POST(
       }
     }, { status: 200 });
   } catch (error: any) {
-    return NextResponse.json({ message: error.message }, { status: 500 });
+    console.error("POST /api/games/[id] error:", error);
+    return NextResponse.json({ message: error.message || "Failed to execute action" }, { status: 500 });
   }
 }
