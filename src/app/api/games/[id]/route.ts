@@ -17,7 +17,6 @@ async function ensureTableColumns() {
     );
   `;
 
-  // Safely add missing columns if table existed prior
   try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS turn INT DEFAULT 1;`; } catch (_) {}
   try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS gold INT DEFAULT 1200;`; } catch (_) {}
   try { await sql`ALTER TABLE games ADD COLUMN IF NOT EXISTS manpower INT DEFAULT 10000;`; } catch (_) {}
@@ -70,7 +69,6 @@ export async function GET(
 
     return NextResponse.json({ game: gameState }, { status: 200 });
   } catch (error: any) {
-    console.error("GET /api/games/[id] error:", error);
     return NextResponse.json({ message: error.message || "Server Error" }, { status: 500 });
   }
 }
@@ -101,6 +99,7 @@ export async function POST(
     let turn = (game.turn ?? 1) + 1;
     let gold = (game.gold ?? 1200) + 200;
     let manpower = (game.manpower ?? 10000) + 600;
+    let status = game.status || "active";
 
     let territories = game.territories || [
       { id: "t1", name: game.home_country, owner: "player", strength: 180 },
@@ -132,15 +131,22 @@ export async function POST(
       logs.unshift({ message: `Turn ${turn}: Consolidated regional defenses, reinforced garrisons, and gathered economic yields.` });
     }
 
+    // Check Global Conquest Win Condition
+    const allConquered = territories.every((t: any) => t.owner === "player");
+    if (allConquered) {
+      status = "completed";
+      logs.unshift({ message: `👑 GLOBAL DOMINATION ACHIEVED! All territories have been unified under your nation's banner!` });
+    }
+
     const territoriesJson = JSON.stringify(territories);
     const logsJson = JSON.stringify(logs);
 
-    // Update database record safely
     await sql`
       UPDATE games 
       SET turn = ${turn}, 
           gold = ${gold}, 
           manpower = ${manpower}, 
+          status = ${status},
           territories = ${territoriesJson}::jsonb, 
           logs = ${logsJson}::jsonb
       WHERE id = ${numericId}
@@ -151,7 +157,7 @@ export async function POST(
         id: game.id,
         gameId: game.id,
         homeCountry: game.home_country,
-        status: game.status,
+        status,
         turn,
         resources: { gold, manpower },
         territories,
@@ -159,7 +165,6 @@ export async function POST(
       }
     }, { status: 200 });
   } catch (error: any) {
-    console.error("POST /api/games/[id] error:", error);
     return NextResponse.json({ message: error.message || "Failed to execute action" }, { status: 500 });
   }
 }
