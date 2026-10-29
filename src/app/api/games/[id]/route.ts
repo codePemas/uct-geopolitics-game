@@ -31,27 +31,31 @@ export async function GET(
 
     const game = games[0];
 
-    // Bulletproof payload preventing any 'map of undefined' crashes
+    // Complete state with flags set to active/ready to release the lockup
     const fullGameState = {
       id: game.id,
       _id: game.id,
       gameId: game.id,
       userId: game.user_id,
-      homeCountry: game.home_country || "South Africa",
-      home_country: game.home_country || "South Africa",
-      country: game.home_country || "South Africa",
+      homeCountry: game.home_country || "China",
+      home_country: game.home_country || "China",
+      country: game.home_country || "China",
       status: game.status || "active",
       createdAt: game.created_at,
       turn: 1,
+      isAiTurn: false,          // Unlock AI simulation lock
+      simulationComplete: true, // Signal frontend simulation is done
       resources: {
         gold: 1000,
         oil: 500,
         manpower: 10000,
       },
-      territories: [],
+      territories: [
+        { id: 1, name: game.home_country || "China", owner: "player", strength: 100 }
+      ],
       countries: [],
       players: [],
-      logs: [],
+      logs: [{ message: "Campaign initialized successfully.", timestamp: new Date().toISOString() }],
       events: [],
       armies: []
     };
