@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Swords, Shield, FastForward, Play, RefreshCw, LogIn, UserPlus, Trophy } from "lucide-react";
+import { Swords, Shield, FastForward, Play, Trophy } from "lucide-react";
 import { WORLD_COUNTRIES } from "@/lib/countriesData";
 
 export default function GameDashboard() {
@@ -14,12 +14,10 @@ export default function GameDashboard() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [game, setGame] = useState<any>(null);
 
-  const [selectedAttackerId, setSelectedAttackerId] = useState<string | null>(null);
-  const [selectedDefenderId, setSelectedDefenderId] = useState<string | null>(null);
-  const [transferAmount, setTransferAmount] = useState(1);
+  const [selectedAttackerId, setSelectedAttackerId] = useState<string>("t1");
+  const [selectedDefenderId, setSelectedDefenderId] = useState<string>("t2");
   const [loadingAction, setLoadingAction] = useState(false);
 
-  // Load active game data
   const fetchGame = async (gameId: string) => {
     try {
       const res = await fetch(`/api/games/${gameId}`);
@@ -31,15 +29,6 @@ export default function GameDashboard() {
     }
   };
 
-  useEffect(() => {
-    if (currentGameId) {
-      fetchGame(currentGameId);
-      const interval = setInterval(() => fetchGame(currentGameId), 3000);
-      return () => clearInterval(interval);
-    }
-  }, [currentGameId]);
-
-  // Handle Authentication
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -52,7 +41,6 @@ export default function GameDashboard() {
         body: JSON.stringify(authForm),
       });
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error || data.message || "Authentication failed");
 
       if (authMode === "register") {
@@ -66,7 +54,6 @@ export default function GameDashboard() {
     }
   };
 
-  // Start a new single player game session
   const handleStartGame = async () => {
     setLoadingAction(true);
     try {
@@ -75,25 +62,16 @@ export default function GameDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user?.id || 1,
-          username: user?.username || "Player",
           country: selectedHomeCountry,
-          playerCountryId: selectedHomeCountry,
         }),
       });
       const data = await res.json();
-      
       if (res.ok) {
-        const resolvedId = data.gameId || data.id || data._id || (data.game && (data.game.id || data.game._id || data.game.gameId));
+        const resolvedId = data.gameId || data.id || data._id || (data.game && data.game.id);
         if (resolvedId) {
-          const stringId = String(resolvedId);
-          setCurrentGameId(stringId);
-          await fetchGame(stringId);
-        } else {
-          console.error("No valid game ID returned in response:", data);
-          alert("Campaign created, but game ID was missing in response.");
+          setCurrentGameId(String(resolvedId));
+          await fetchGame(String(resolvedId));
         }
-      } else {
-        alert(data.message || "Failed to start campaign");
       }
     } catch (err) {
       console.error("Error starting game:", err);
@@ -102,7 +80,7 @@ export default function GameDashboard() {
     }
   };
 
-  const handleExecuteAction = async (action: "ATTACK" | "TRANSFER" | "SKIP") => {
+  const handleExecuteAction = async (action: "ATTACK" | "SKIP") => {
     if (!currentGameId) return;
     setLoadingAction(true);
     try {
@@ -110,11 +88,9 @@ export default function GameDashboard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user?.id || 1,
           action,
           fromCountryId: selectedAttackerId,
           toCountryId: selectedDefenderId,
-          transferCount: transferAmount,
         }),
       });
       if (res.ok) {
@@ -122,7 +98,7 @@ export default function GameDashboard() {
         setGame(data.game || data);
       }
     } catch (err) {
-      console.error("Action execution error:", err);
+      console.error("Action error:", err);
     } finally {
       setLoadingAction(false);
     }
@@ -209,11 +185,7 @@ export default function GameDashboard() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-emerald-400 font-medium">Logged in as: {user.username}</span>
           <button
-            onClick={() => {
-              setUser(null);
-              setCurrentGameId(null);
-              setGame(null);
-            }}
+            onClick={() => { setUser(null); setCurrentGameId(null); setGame(null); }}
             className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-lg text-xs font-semibold transition"
           >
             Sign Out
@@ -226,20 +198,18 @@ export default function GameDashboard() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
           <div>
             <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-4">
-              <Play className="w-5 h-5" /> Launch New Game
+              <Play className="w-5 h-5" /> Launch Campaign
             </h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">Select Your Home Country</label>
+                <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">Home Nation</label>
                 <select
                   value={selectedHomeCountry}
                   onChange={(e) => setSelectedHomeCountry(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 text-sm"
                 >
                   {WORLD_COUNTRIES.map((c) => (
-                    <option key={c.name} value={c.name}>
-                      {c.name} (Pop: {c.population})
-                    </option>
+                    <option key={c.name} value={c.name}>{c.name} (Pop: {c.population})</option>
                   ))}
                 </select>
               </div>
@@ -249,21 +219,55 @@ export default function GameDashboard() {
                 disabled={loadingAction}
                 className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-emerald-900/20 disabled:opacity-50 text-sm"
               >
-                {loadingAction ? "Initializing Campaign..." : "Start Single-Player Campaign"}
+                {loadingAction ? "Setting up Database..." : "Start Conquest Campaign"}
               </button>
             </div>
           </div>
 
-          {currentGameId && (
-            <div className="mt-8 pt-6 border-t border-slate-800">
-              <h3 className="text-sm font-semibold text-slate-300 mb-3">Turn Commands</h3>
-              <div className="space-y-2">
+          {currentGameId && game && (
+            <div className="mt-8 pt-6 border-t border-slate-800 space-y-4">
+              <h3 className="text-sm font-semibold text-slate-300">Strategic Command Orders</h3>
+              
+              <div>
+                <label className="block text-xs text-slate-400 uppercase mb-1">Attacking Territory</label>
+                <select
+                  value={selectedAttackerId}
+                  onChange={(e) => setSelectedAttackerId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"
+                >
+                  {game.territories?.filter((t: any) => t.owner === "player").map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name} (Strength: {t.strength})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 uppercase mb-1">Target Territory</label>
+                <select
+                  value={selectedDefenderId}
+                  onChange={(e) => setSelectedDefenderId(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100"
+                >
+                  {game.territories?.filter((t: any) => t.owner !== "player").map((t: any) => (
+                    <option key={t.id} value={t.id}>{t.name} ({t.owner} - Str: {t.strength})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <button
+                  onClick={() => handleExecuteAction("ATTACK")}
+                  disabled={loadingAction}
+                  className="bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1"
+                >
+                  <Swords className="w-4 h-4" /> Attack
+                </button>
                 <button
                   onClick={() => handleExecuteAction("SKIP")}
                   disabled={loadingAction}
-                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1"
                 >
-                  <FastForward className="w-4 h-4 text-amber-400" /> End Turn / Skip Phase
+                  <FastForward className="w-4 h-4 text-amber-400" /> End Turn
                 </button>
               </div>
             </div>
@@ -272,56 +276,63 @@ export default function GameDashboard() {
 
         {/* Right Main Dashboard Area */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[400px] flex flex-col justify-between">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[450px] flex flex-col justify-between">
             {!currentGameId || !game ? (
-              <div className="flex flex-col items-center justify-center h-full my-auto py-20 text-center">
+              <div className="flex flex-col items-center justify-center h-full my-auto py-24 text-center">
                 <Shield className="w-16 h-16 text-slate-700 mb-4 animate-pulse" />
-                <h3 className="text-xl font-bold text-slate-300 mb-1">No Active Game Session</h3>
+                <h3 className="text-xl font-bold text-slate-300 mb-1">No Active Campaign</h3>
                 <p className="text-sm text-slate-500 max-w-sm">
-                  Select your home country on the left control panel and start your campaign to begin global conquest strategy.
+                  Select your home country on the left and start your campaign to command territorial conquests.
                 </p>
               </div>
             ) : (
-              <div>
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-xs uppercase tracking-widest text-amber-500 font-semibold">Active Campaign</span>
-                    <h2 className="text-2xl font-bold text-slate-100">{game.homeCountry || game.home_country || selectedHomeCountry}</h2>
+                    <h2 className="text-2xl font-bold text-slate-100">{game.homeCountry}</h2>
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
                     <div className="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-center">
                       <span className="block text-[10px] uppercase text-slate-500">Turn</span>
-                      <span className="text-lg font-bold text-amber-400">{game.turn || 1}</span>
+                      <span className="text-lg font-bold text-amber-400">{game.turn}</span>
                     </div>
                     <div className="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-center">
                       <span className="block text-[10px] uppercase text-slate-500">Gold</span>
-                      <span className="text-lg font-bold text-emerald-400">{game.resources?.gold ?? 1000}</span>
+                      <span className="text-lg font-bold text-emerald-400">{game.resources?.gold}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <Swords className="w-4 h-4 text-amber-500" /> Territorial Map & Status
-                    </h4>
-                    <p className="text-sm text-slate-300">Status: <span className="text-emerald-400 font-medium capitalize">{game.status}</span></p>
-                    <p className="text-xs text-slate-500 mt-1">Conquest engine active on PostgreSQL backend.</p>
+                {/* Territorial Map Grid */}
+                <div>
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <Swords className="w-4 h-4 text-amber-500" /> Global Territorial Grid
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {game.territories?.map((t: any) => (
+                      <div key={t.id} className={`p-4 rounded-xl border ${t.owner === 'player' ? 'bg-emerald-950/20 border-emerald-800/50' : 'bg-slate-950 border-slate-800'}`}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-sm text-slate-200">{t.name}</span>
+                          <span className={`text-[10px] uppercase px-2 py-0.5 rounded font-semibold ${t.owner === 'player' ? 'bg-emerald-900 text-emerald-300' : 'bg-red-950 text-red-300'}`}>
+                            {t.owner}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">Garrison Strength: <span className="text-amber-400 font-bold">{t.strength}</span></p>
+                      </div>
+                    ))}
                   </div>
+                </div>
 
-                  <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
-                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-amber-500" /> Strategic Feed
-                    </h4>
-                    <div className="space-y-1 max-h-24 overflow-y-auto text-xs text-slate-400">
-                      {game.logs && game.logs.length > 0 ? (
-                        game.logs.map((log: any, idx: number) => (
-                          <p key={idx}>• {typeof log === 'string' ? log : log.message}</p>
-                        ))
-                      ) : (
-                        <p className="text-slate-500 italic">No recent combat events recorded.</p>
-                      )}
-                    </div>
+                {/* Strategic Feed */}
+                <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-amber-500" /> AI Battle Commentary & Feed
+                  </h4>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto text-xs text-slate-300">
+                    {game.logs?.map((log: any, idx: number) => (
+                      <p key={idx} className="border-l-2 border-amber-500/50 pl-2 py-0.5">• {log.message}</p>
+                    ))}
                   </div>
                 </div>
               </div>
