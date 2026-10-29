@@ -15,27 +15,32 @@ async function initGamesTable() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     const { country, userId } = body;
 
     await initGamesTable();
 
     const newGame = await sql`
       INSERT INTO games (user_id, home_country, status)
-      VALUES (${userId || null}, ${country || "South Africa"}, 'active')
+      VALUES (${userId ? parseInt(userId, 10) : null}, ${country || "South Africa"}, 'active')
       RETURNING *;
     `;
 
     const game = newGame[0];
+    const gameId = game.id;
 
+    // Return every possible ID variant so the frontend captures it instantly
     return NextResponse.json(
       {
         message: "Campaign started successfully!",
-        id: game.id,
-        _id: game.id, // Root-level compatibility for frontend
+        id: gameId,
+        _id: gameId,
+        gameId: gameId,
         game: {
           ...game,
-          _id: game.id,
+          id: gameId,
+          _id: gameId,
+          gameId: gameId,
         },
       },
       { status: 201 }
