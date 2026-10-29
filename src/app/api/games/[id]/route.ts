@@ -31,7 +31,7 @@ export async function GET(
 
     const game = games[0];
 
-    // Safe full game object payload
+    // Bulletproof payload preventing any 'map of undefined' crashes
     const fullGameState = {
       id: game.id,
       _id: game.id,
@@ -49,7 +49,11 @@ export async function GET(
         manpower: 10000,
       },
       territories: [],
-      logs: []
+      countries: [],
+      players: [],
+      logs: [],
+      events: [],
+      armies: []
     };
 
     return NextResponse.json(
