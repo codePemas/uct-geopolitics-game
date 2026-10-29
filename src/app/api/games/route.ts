@@ -31,9 +31,11 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         message: "Campaign started successfully!",
+        id: game.id,
+        _id: game.id, // Root-level compatibility for frontend
         game: {
           ...game,
-          _id: game.id, // Compatibility alias for frontend code expecting MongoDB _id
+          _id: game.id,
         },
       },
       { status: 201 }
