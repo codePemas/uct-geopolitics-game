@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Swords, Shield, FastForward, Play, RefreshCw, LogIn, UserPlus, Trophy, Eye } from "lucide-react";
+import { Swords, Shield, FastForward, Play, RefreshCw, LogIn, UserPlus, Trophy } from "lucide-react";
 import { WORLD_COUNTRIES } from "@/lib/countriesData";
 
 export default function GameDashboard() {
@@ -10,14 +10,13 @@ export default function GameDashboard() {
   const [authForm, setAuthForm] = useState({ username: "", email: "", password: "" });
   const [authError, setAuthError] = useState("");
 
-  const [selectedHomeCountry, setSelectedHomeCountry] = useState("ZA");
+  const [selectedHomeCountry, setSelectedHomeCountry] = useState("South Africa");
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [game, setGame] = useState<any>(null);
 
   const [selectedAttackerId, setSelectedAttackerId] = useState<string | null>(null);
   const [selectedDefenderId, setSelectedDefenderId] = useState<string | null>(null);
   const [transferAmount, setTransferAmount] = useState(1);
-  const [isFastForwarding, setIsFastForwarding] = useState(false);
   const [loadingAction, setLoadingAction] = useState(false);
 
   // Load active game data
@@ -26,9 +25,9 @@ export default function GameDashboard() {
       const res = await fetch(`/api/games/${gameId}`);
       if (!res.ok) return;
       const data = await res.json();
-      setGame(data);
+      setGame(data.game || data);
     } catch (err) {
-      console.error(err);
+      console.error("Failed to fetch game state:", err);
     }
   };
 
@@ -54,7 +53,7 @@ export default function GameDashboard() {
       });
       const data = await res.json();
 
-      if (!res.ok) throw new Error(data.error || "Authentication failed");
+      if (!res.ok) throw new Error(data.error || data.message || "Authentication failed");
 
       if (authMode === "register") {
         setAuthMode("login");
@@ -67,174 +66,179 @@ export default function GameDashboard() {
     }
   };
 
-  // Start a new single-player game session
+  // Start a new single player game session
   const handleStartGame = async () => {
-    if (!user) return;
     setLoadingAction(true);
     try {
       const res = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.id,
-          username: user.username,
+          userId: user?.id || 1,
+          username: user?.username || "Player",
+          country: selectedHomeCountry,
           playerCountryId: selectedHomeCountry,
         }),
       });
       const data = await res.json();
+      
       if (res.ok) {
-        setCurrentGameId(data.gameId);
-        fetchGame(data.gameId);
+        const resolvedId = data.gameId || data.id || data._id || (data.game && (data.game.id || data.game._id || data.game.gameId));
+        if (resolvedId) {
+          const stringId = String(resolvedId);
+          setCurrentGameId(stringId);
+          await fetchGame(stringId);
+        } else {
+          console.error("No valid game ID returned in response:", data);
+          alert("Campaign created, but game ID was missing in response.");
+        }
+      } else {
+        alert(data.message || "Failed to start campaign");
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error starting game:", err);
     } finally {
       setLoadingAction(false);
     }
   };
 
-  // Execute Turn Action (ATTACK, TRANSFER, SKIP)
   const handleExecuteAction = async (action: "ATTACK" | "TRANSFER" | "SKIP") => {
-    if (!currentGameId || !user) return;
+    if (!currentGameId) return;
     setLoadingAction(true);
     try {
       const res = await fetch(`/api/games/${currentGameId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.id,
+          userId: user?.id || 1,
           action,
           fromCountryId: selectedAttackerId,
           toCountryId: selectedDefenderId,
           transferCount: transferAmount,
         }),
       });
-      const data = await res.json();
       if (res.ok) {
-        setGame(data);
-        if (action === "ATTACK") {
-          setSelectedAttackerId(null);
-          setSelectedDefenderId(null);
-        }
+        const data = await res.json();
+        setGame(data.game || data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Action execution error:", err);
     } finally {
       setLoadingAction(false);
     }
   };
 
-  const isMyTurn = game && user && game.currentTurnPlayerId === user.id;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+          <h1 className="text-2xl font-bold text-amber-500 mb-2">GEOPOLITICS INF4001N</h1>
+          <p className="text-slate-400 text-sm mb-6">Sign in or register to launch your global conquest campaign.</p>
+
+          {authError && <div className="bg-red-950/50 border border-red-800 text-red-300 p-3 rounded-lg text-sm mb-4">{authError}</div>}
+
+          <form onSubmit={handleAuth} className="space-y-4">
+            {authMode === "register" && (
+              <div>
+                <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Username</label>
+                <input
+                  type="text"
+                  required
+                  value={authForm.username}
+                  onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                  placeholder="Commander name"
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Email</label>
+              <input
+                type="email"
+                required
+                value={authForm.email}
+                onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                placeholder="commander@domain.com"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Password</label>
+              <input
+                type="password"
+                required
+                value={authForm.password}
+                onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
+                placeholder="••••••••"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold py-3 rounded-lg transition duration-200"
+            >
+              {authMode === "login" ? "Sign In" : "Register Account"}
+            </button>
+          </form>
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setAuthMode(authMode === "login" ? "register" : "login");
+                setAuthError("");
+              }}
+              className="text-xs text-amber-400 hover:underline"
+            >
+              {authMode === "login" ? "Don't have an account? Register" : "Already have an account? Sign In"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6">
-      <header className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between border-b border-slate-800 pb-4 mb-6 gap-4">
+      <header className="max-w-7xl mx-auto flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
         <div>
           <h1 className="text-3xl font-extrabold tracking-tight text-amber-500">
             GEOPOLITICS <span className="text-slate-300 font-normal">INF4001N</span>
           </h1>
           <p className="text-sm text-slate-400">Single-Player Global Conquest Strategy</p>
         </div>
-
-        {user ? (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-emerald-400 font-medium">Logged in as: {user.username}</span>
-            <button
-              onClick={() => {
-                setUser(null);
-                setGame(null);
-                setCurrentGameId(null);
-              }}
-              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded text-slate-300"
-            >
-              Sign Out
-            </button>
-          </div>
-        ) : (
-          <div className="text-sm text-amber-400 font-medium flex items-center gap-2">
-            <Eye className="w-4 h-4" /> Spectator View Mode (Log in to Play)
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-emerald-400 font-medium">Logged in as: {user.username}</span>
+          <button
+            onClick={() => {
+              setUser(null);
+              setCurrentGameId(null);
+              setGame(null);
+            }}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-lg text-xs font-semibold transition"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
-      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT PANEL: Auth / Game Creation Controls */}
-        <div className="lg:col-span-4 space-y-6">
-          {!user && (
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  {authMode === "login" ? <LogIn className="w-5 h-5 text-amber-500" /> : <UserPlus className="w-5 h-5 text-amber-500" />}
-                  {authMode === "login" ? "Player Login" : "Register Player"}
-                </h2>
-                <button
-                  onClick={() => setAuthMode(authMode === "login" ? "register" : "login")}
-                  className="text-xs text-amber-400 underline"
-                >
-                  Switch to {authMode === "login" ? "Register" : "Login"}
-                </button>
-              </div>
-
-              {authError && <p className="text-xs text-rose-400 mb-3 bg-rose-950/40 p-2 rounded">{authError}</p>}
-
-              <form onSubmit={handleAuth} className="space-y-3">
-                {authMode === "register" && (
-                  <div>
-                    <label className="text-xs text-slate-400">Username</label>
-                    <input
-                      type="text"
-                      required
-                      value={authForm.username}
-                      onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="text-xs text-slate-400">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    value={authForm.email}
-                    onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-slate-400">Password</label>
-                  <input
-                    type="password"
-                    required
-                    value={authForm.password}
-                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="w-full bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-2 rounded transition-all text-sm mt-2"
-                >
-                  {authMode === "login" ? "Sign In" : "Create Account"}
-                </button>
-              </form>
-            </div>
-          )}
-
-          {user && (
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
-              <h2 className="text-lg font-bold flex items-center gap-2 text-amber-400">
-                <Play className="w-5 h-5" /> Launch New Game
-              </h2>
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Control Panel */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-4">
+              <Play className="w-5 h-5" /> Launch New Game
+            </h2>
+            <div className="space-y-4">
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Select Your Home Country</label>
+                <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">Select Your Home Country</label>
                 <select
                   value={selectedHomeCountry}
                   onChange={(e) => setSelectedHomeCountry(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-sm"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 text-sm"
                 >
                   {WORLD_COUNTRIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} (Pop: {(c.population / 1_000_000).toFixed(1)}M)
+                    <option key={c.name} value={c.name}>
+                      {c.name} (Pop: {c.population})
                     </option>
                   ))}
                 </select>
@@ -243,185 +247,86 @@ export default function GameDashboard() {
               <button
                 onClick={handleStartGame}
                 disabled={loadingAction}
-                className="w-full bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold py-2 rounded transition-all text-sm disabled:opacity-50"
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-emerald-900/20 disabled:opacity-50 text-sm"
               >
-                {loadingAction ? "Initializing..." : "Start Single-Player Campaign"}
+                {loadingAction ? "Initializing Campaign..." : "Start Single-Player Campaign"}
               </button>
             </div>
-          )}
+          </div>
 
-          {/* TURN COMMAND CONTROLS */}
-          {game && user && (
-            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-md font-bold text-slate-200">Turn Commands</h3>
+          {currentGameId && (
+            <div className="mt-8 pt-6 border-t border-slate-800">
+              <h3 className="text-sm font-semibold text-slate-300 mb-3">Turn Commands</h3>
+              <div className="space-y-2">
                 <button
-                  onClick={() => setIsFastForwarding(!isFastForwarding)}
-                  className={`text-xs px-2.5 py-1 rounded flex items-center gap-1 font-semibold border ${
-                    isFastForwarding ? "bg-amber-500/20 border-amber-500 text-amber-400" : "bg-slate-800 border-slate-700 text-slate-400"
-                  }`}
+                  onClick={() => handleExecuteAction("SKIP")}
+                  disabled={loadingAction}
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2"
                 >
-                  <FastForward className="w-3.5 h-3.5" /> Fast-Forward
+                  <FastForward className="w-4 h-4 text-amber-400" /> End Turn / Skip Phase
                 </button>
               </div>
-
-              {!isMyTurn ? (
-                <p className="text-xs text-amber-400 animate-pulse bg-amber-950/30 p-2 rounded border border-amber-900/50">
-                  Simulating AI Turns... Please wait for your turn.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-xs text-slate-400">
-                    <p>Attacker: <span className="text-emerald-400 font-bold">{selectedAttackerId || "Select Country"}</span></p>
-                    <p>Target: <span className="text-rose-400 font-bold">{selectedDefenderId || "Select Target"}</span></p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleExecuteAction("ATTACK")}
-                      disabled={!selectedAttackerId || !selectedDefenderId || loadingAction}
-                      className="bg-rose-700 hover:bg-rose-600 text-white font-bold py-2 rounded text-xs flex items-center justify-center gap-1 disabled:opacity-40"
-                    >
-                      <Swords className="w-4 h-4" /> Attack
-                    </button>
-
-                    <button
-                      onClick={() => handleExecuteAction("SKIP")}
-                      disabled={loadingAction}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2 rounded text-xs"
-                    >
-                      Skip Turn
-                    </button>
-                  </div>
-
-                  <div className="pt-2 border-t border-slate-800">
-                    <label className="text-xs text-slate-400">Transfer Soldiers</label>
-                    <div className="flex gap-2 mt-1">
-                      <input
-                        type="number"
-                        min="1"
-                        value={transferAmount}
-                        onChange={(e) => setTransferAmount(parseInt(e.target.value) || 1)}
-                        className="w-20 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs"
-                      />
-                      <button
-                        onClick={() => handleExecuteAction("TRANSFER")}
-                        disabled={!selectedAttackerId || !selectedDefenderId || loadingAction}
-                        className="flex-1 bg-sky-700 hover:bg-sky-600 text-white text-xs font-bold py-1 rounded disabled:opacity-40"
-                      >
-                        Transfer
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
 
-        {/* RIGHT PANEL: Game Board Grid & Dynamic Battle Feed */}
-        <div className="lg:col-span-8 space-y-6">
-          {game ? (
-            <>
-              {/* BOARD STATE GRID */}
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
-                <div className="flex justify-between items-center mb-4">
+        {/* Right Main Dashboard Area */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl min-h-[400px] flex flex-col justify-between">
+            {!currentGameId || !game ? (
+              <div className="flex flex-col items-center justify-center h-full my-auto py-20 text-center">
+                <Shield className="w-16 h-16 text-slate-700 mb-4 animate-pulse" />
+                <h3 className="text-xl font-bold text-slate-300 mb-1">No Active Game Session</h3>
+                <p className="text-sm text-slate-500 max-w-sm">
+                  Select your home country on the left control panel and start your campaign to begin global conquest strategy.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
                   <div>
-                    <span className="text-xs text-amber-500 font-bold uppercase tracking-wider">Round {game.round}</span>
-                    <h2 className="text-xl font-bold">Territorial Map (10 Nations)</h2>
+                    <span className="text-xs uppercase tracking-widest text-amber-500 font-semibold">Active Campaign</span>
+                    <h2 className="text-2xl font-bold text-slate-100">{game.homeCountry || game.home_country || selectedHomeCountry}</h2>
                   </div>
-                  {game.status === "COMPLETED" && (
-                    <span className="bg-emerald-950 border border-emerald-500 text-emerald-400 text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold">
-                      <Trophy className="w-4 h-4" /> Game Completed
-                    </span>
-                  )}
+                  <div className="flex items-center gap-6">
+                    <div className="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-center">
+                      <span className="block text-[10px] uppercase text-slate-500">Turn</span>
+                      <span className="text-lg font-bold text-amber-400">{game.turn || 1}</span>
+                    </div>
+                    <div className="bg-slate-950 px-4 py-2 rounded-xl border border-slate-800 text-center">
+                      <span className="block text-[10px] uppercase text-slate-500">Gold</span>
+                      <span className="text-lg font-bold text-emerald-400">{game.resources?.gold ?? 1000}</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {game.countries.map((c: any) => {
-                    const isAttacker = selectedAttackerId === c.id;
-                    const isDefender = selectedDefenderId === c.id;
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <Swords className="w-4 h-4 text-amber-500" /> Territorial Map & Status
+                    </h4>
+                    <p className="text-sm text-slate-300">Status: <span className="text-emerald-400 font-medium capitalize">{game.status}</span></p>
+                    <p className="text-xs text-slate-500 mt-1">Conquest engine active on PostgreSQL backend.</p>
+                  </div>
 
-                    return (
-                      <div
-                        key={c.id}
-                        onClick={() => {
-                          if (c.ownerId === user?.id) {
-                            setSelectedAttackerId(c.id);
-                          } else {
-                            setSelectedDefenderId(c.id);
-                          }
-                        }}
-                        className={`p-4 rounded-lg border cursor-pointer transition-all ${
-                          c.isPlayer
-                            ? "bg-slate-950 border-emerald-500/50 hover:border-emerald-400"
-                            : "bg-slate-950 border-slate-800 hover:border-rose-500/50"
-                        } ${isAttacker ? "ring-2 ring-emerald-500 bg-emerald-950/20" : ""} ${
-                          isDefender ? "ring-2 ring-rose-500 bg-rose-950/20" : ""
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-bold text-sm text-slate-200">{c.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded font-mono bg-slate-900 text-slate-400">
-                            {c.id}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center text-xs">
-                          <span className="text-slate-400 flex items-center gap-1">
-                            <Shield className="w-3.5 h-3.5 text-sky-400" /> Forces:
-                          </span>
-                          <span className="font-extrabold text-amber-400 text-sm">{c.currentSoldiers}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl">
+                    <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-amber-500" /> Strategic Feed
+                    </h4>
+                    <div className="space-y-1 max-h-24 overflow-y-auto text-xs text-slate-400">
+                      {game.logs && game.logs.length > 0 ? (
+                        game.logs.map((log: any, idx: number) => (
+                          <p key={idx}>• {typeof log === 'string' ? log : log.message}</p>
+                        ))
+                      ) : (
+                        <p className="text-slate-500 italic">No recent combat events recorded.</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* DYNAMIC BATTLE LOG & AI COMMENTARY FEED */}
-              <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
-                <h3 className="text-md font-bold mb-3 flex items-center gap-2 text-slate-200">
-                  <Swords className="w-4 h-4 text-amber-500" /> Dynamic Battle Feed & AI Commentary
-                </h3>
-
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                  {game.logs
-                    .slice()
-                    .reverse()
-                    .map((log: any, idx: number) => (
-                      <div key={idx} className="bg-slate-950 border border-slate-800/80 p-3 rounded text-xs space-y-1">
-                        <div className="flex justify-between text-slate-400">
-                          <span className="font-bold text-amber-400">{log.actorName}</span>
-                          <span>Round {log.turn}</span>
-                        </div>
-                        <p className="text-slate-300">{log.details}</p>
-
-                        {log.justification && (
-                          <p className="text-amber-300/80 italic bg-amber-950/20 p-1.5 rounded mt-1">
-                            💡 AI Tactical Reason: {log.justification}
-                          </p>
-                        )}
-
-                        {log.commentary && (
-                          <p className="text-emerald-300 font-medium bg-emerald-950/20 p-2 rounded mt-1 border border-emerald-900/40">
-                            🎙️ AI Commentary: {log.commentary}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="bg-slate-900 border border-slate-800 p-12 rounded-xl shadow-lg text-center space-y-3">
-              <Shield className="w-12 h-12 text-amber-500/50 mx-auto" />
-              <h3 className="text-lg font-bold text-slate-300">No Active Game Session</h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Log in and launch a campaign from the left control panel to begin your global conquest strategy.
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
     </div>
