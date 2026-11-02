@@ -117,14 +117,14 @@ export async function POST(
       if (attacker && defender) {
         if (defender.owner === "player") {
           logs.unshift({ message: `⚠️ Invalid target: You already control ${defender.name}!` });
-        } else if (attacker.strength > defender.strength) {
+        } else if (attacker.strength >= defender.strength) {
           defender.owner = "player";
-          defender.strength = Math.floor(attacker.strength * 0.7);
+          defender.strength = Math.max(100, Math.floor(attacker.strength * 0.8));
           gold += 350;
           logs.unshift({ message: `🏆 VICTORY! ${attacker.name} successfully conquered ${defender.name}! Acquired +350 Gold.` });
         } else {
-          attacker.strength = Math.max(20, attacker.strength - 40);
-          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by defense forces.` });
+          attacker.strength = Math.max(20, attacker.strength - 30);
+          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by enemy defenses.` });
         }
       }
     } else if (action === "SKIP") {

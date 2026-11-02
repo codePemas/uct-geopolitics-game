@@ -17,8 +17,8 @@ export default function GameDashboard() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [game, setGame] = useState<any>(null);
 
-  const [selectedAttackerId, setSelectedAttackerId] = useState<string>("t1");
-  const [selectedDefenderId, setSelectedDefenderId] = useState<string>("t2");
+  const [selectedAttackerId, setSelectedAttackerId] = useState<string>("");
+  const [selectedDefenderId, setSelectedDefenderId] = useState<string>("");
   const [loadingAction, setLoadingAction] = useState(false);
 
   // Web Audio API Sound Synthesizer
@@ -72,6 +72,19 @@ export default function GameDashboard() {
       const data = await res.json();
       const updatedGame = data.game || data;
       setGame(updatedGame);
+
+      // Auto-select valid defaults for attack controls if empty
+      if (updatedGame.territories) {
+        const playerTerritories = updatedGame.territories.filter((t: any) => t.owner === "player");
+        const enemyTerritories = updatedGame.territories.filter((t: any) => t.owner !== "player");
+
+        if (playerTerritories.length > 0 && (!selectedAttackerId || !playerTerritories.some((t: any) => t.id === selectedAttackerId))) {
+          setSelectedAttackerId(playerTerritories[0].id);
+        }
+        if (enemyTerritories.length > 0 && (!selectedDefenderId || !enemyTerritories.some((t: any) => t.id === selectedDefenderId))) {
+          setSelectedDefenderId(enemyTerritories[0].id);
+        }
+      }
 
       if (updatedGame.status === "completed") {
         playSound("win_campaign");
@@ -151,7 +164,16 @@ export default function GameDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        setGame(data.game || data);
+        const updatedGame = data.game || data;
+        setGame(updatedGame);
+
+        // Reset defender selection if target was conquered
+        if (updatedGame.territories) {
+          const remainingEnemies = updatedGame.territories.filter((t: any) => t.owner !== "player");
+          if (remainingEnemies.length > 0) {
+            setSelectedDefenderId(remainingEnemies[0].id);
+          }
+        }
       }
     } catch (err) {
       console.error("Action error:", err);
@@ -228,7 +250,6 @@ export default function GameDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 bg-[url('/bg-war.jpg')] bg-cover bg-center bg-no-repeat bg-fixed relative">
-      {/* Dark tint overlay for Pinterest war wallpaper */}
       <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-[2px] pointer-events-none" />
 
       <div className="relative z-10 max-w-7xl mx-auto">
@@ -334,7 +355,7 @@ export default function GameDashboard() {
                 <div className="grid grid-cols-2 gap-2 pt-2">
                   <button
                     onClick={() => handleExecuteAction("ATTACK")}
-                    disabled={loadingAction || game.status === "completed"}
+                    disabled={loadingAction || game.status === "completed" || !selectedDefenderId}
                     className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-slate-950 font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-1"
                   >
                     <Swords className="w-4 h-4" /> Attack
