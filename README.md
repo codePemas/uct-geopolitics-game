@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GEOPOLITICS INF4001N – Single-Player Global Conquest Strategy
 
-## Getting Started
+An interactive, turn-based geopolitical strategy web application built for academic assessment and full-stack demonstration. Command your home nation, execute tactical territorial assaults, manage gold and military resources, and establish global hegemony against adaptive AI opponents.
 
-First, run the development server:
+**Live Application:** [https://uct-geopolitics-game-mu.vercel.app](https://uct-geopolitics-game-mu.vercel.app)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Key Features
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+* **Global Campaign System**: Launch strategy campaigns with custom home nation selection and adjustable AI difficulty levels (Easy, Medium, Hard).
+* **Interactive Territorial Grid**: Command garrisons across a dynamic global grid with real-time status tracking (Player, AI, Neutral).
+* **Strategic Command Orders**:
+  * **Tactical Conquest**: Engage enemy or neutral garrisons with deterministic army strength calculations.
+  * **Resource Management**: Accumulate gold yields and reinforce garrisons turn-by-turn.
+* **Persistent Game State**: Hosted on Neon PostgreSQL utilizing JSONB column structures for persistent game state recovery and seamless multi-turn campaigns.
+* **AI Battle Commentary & Feed**: Live event feed logging battle results, economic yields, and strategic alerts.
+* **Global Victory Modal**: Triggers when total global domination is achieved, complete with campaign metrics and victory sound effects.
+* **Audio & Atmospheric Polish**: Built-in Web Audio API synthetic sound effects engine alongside custom military glassmorphism styling.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## Tech Stack
 
-To learn more about Next.js, take a look at the following resources:
+* **Frontend**: [Next.js](https://nextjs.org/) (App Router), React, TypeScript, Tailwind CSS
+* **Icons & UI Components**: [Lucide React](https://lucide.dev/), Custom Glassmorphism
+* **Database**: [Neon PostgreSQL](https://neon.tech/) with dynamic column migration handlers
+* **Audio**: Browser-native Web Audio API synthesizer
+* **Deployment**: [Vercel](https://vercel.app)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Getting Started Locally
 
-## Deploy on Vercel
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/your-username/uct-geopolitics-game.git](https://github.com/your-username/uct-geopolitics-game.git)
+   cd uct-geopolitics-game
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+2. **Install Dependencies:**
+    '''bash 
+    npm install
+    **Configure environmeb=nt variables**
+    DATABASE_URL=postgres://user:password@endpoint.neon.tech/neondb?sslmode=require
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+    npm run dev
+
+## Step 3: Commit and Clean Repository
