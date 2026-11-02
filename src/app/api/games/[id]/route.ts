@@ -124,14 +124,14 @@ export async function POST(
           logs.unshift({ message: `🏆 VICTORY! ${attacker.name} successfully conquered ${defender.name}! Acquired +350 Gold.` });
         } else {
           attacker.strength = Math.max(20, attacker.strength - 40);
-          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by enemy garrison.` });
+          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by defense forces.` });
         }
       }
     } else if (action === "SKIP") {
       logs.unshift({ message: `Turn ${turn}: Consolidated regional defenses, reinforced garrisons, and gathered economic yields.` });
     }
 
-    // Check Global Conquest Win Condition
+    // Check Victory Condition: Are ALL territories owned by player?
     const allConquered = territories.every((t: any) => t.owner === "player");
     if (allConquered) {
       status = "completed";
@@ -165,6 +165,7 @@ export async function POST(
       }
     }, { status: 200 });
   } catch (error: any) {
+    console.error("POST /api/games/[id] error:", error);
     return NextResponse.json({ message: error.message || "Failed to execute action" }, { status: 500 });
   }
 }
