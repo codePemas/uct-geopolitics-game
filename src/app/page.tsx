@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Swords, Shield, FastForward, Play, Trophy, Volume2, VolumeX, Sparkles } from "lucide-react";
+import { Swords, Shield, FastForward, Play, Trophy, Volume2, VolumeX, Sparkles, Eye, Lock } from "lucide-react";
 import { WORLD_COUNTRIES } from "@/lib/countriesData";
 
 export default function GameDashboard() {
@@ -73,7 +73,6 @@ export default function GameDashboard() {
       const updatedGame = data.game || data;
       setGame(updatedGame);
 
-      // Auto-select valid defaults for attack controls if empty
       if (updatedGame.territories) {
         const playerTerritories = updatedGame.territories.filter((t: any) => t.owner === "player");
         const enemyTerritories = updatedGame.territories.filter((t: any) => t.owner !== "player");
@@ -120,13 +119,14 @@ export default function GameDashboard() {
   };
 
   const handleStartGame = async () => {
+    if (!user) return;
     setLoadingAction(true);
     try {
       const res = await fetch("/api/games", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user?.id || 1,
+          userId: user.id || 1,
           country: selectedHomeCountry,
           difficulty,
         }),
@@ -148,7 +148,7 @@ export default function GameDashboard() {
   };
 
   const handleExecuteAction = async (action: "ATTACK" | "SKIP") => {
-    if (!currentGameId) return;
+    if (!currentGameId || !user) return;
     setLoadingAction(true);
     playSound(action === "ATTACK" ? "attack" : "skip");
 
@@ -167,7 +167,6 @@ export default function GameDashboard() {
         const updatedGame = data.game || data;
         setGame(updatedGame);
 
-        // Reset defender selection if target was conquered
         if (updatedGame.territories) {
           const remainingEnemies = updatedGame.territories.filter((t: any) => t.owner !== "player");
           if (remainingEnemies.length > 0) {
@@ -181,72 +180,6 @@ export default function GameDashboard() {
       setLoadingAction(false);
     }
   };
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 bg-cover bg-center bg-no-repeat relative">
-        <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 p-8 rounded-2xl w-full max-w-md shadow-2xl z-10">
-          <h1 className="text-2xl font-bold text-amber-500 mb-2">GEOPOLITICS INF4001N</h1>
-          <p className="text-slate-400 text-sm mb-6">Sign in or register to launch your global conquest campaign.</p>
-
-          {authError && <div className="bg-red-950/50 border border-red-800 text-red-300 p-3 rounded-lg text-sm mb-4">{authError}</div>}
-
-          <form onSubmit={handleAuth} className="space-y-4">
-            {authMode === "register" && (
-              <div>
-                <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Username</label>
-                <input
-                  type="text"
-                  required
-                  value={authForm.username}
-                  onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
-                  className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
-                  placeholder="Commander name"
-                />
-              </div>
-            )}
-            <div>
-              <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={authForm.email}
-                onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
-                placeholder="commander@domain.com"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-400 uppercase tracking-wider mb-1">Password</label>
-              <input
-                type="password"
-                required
-                value={authForm.password}
-                onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500"
-                placeholder="••••••••"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold py-3 rounded-lg transition duration-200"
-            >
-              {authMode === "login" ? "Sign In" : "Register Account"}
-            </button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(""); }}
-              className="text-xs text-amber-400 hover:underline"
-            >
-              {authMode === "login" ? "Don't have an account? Register" : "Already have an account? Sign In"}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 bg-[url('/bg-war.jpg')] bg-cover bg-center bg-no-repeat bg-fixed relative">
@@ -268,61 +201,135 @@ export default function GameDashboard() {
             >
               {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-red-400" />}
             </button>
-            <span className="text-sm text-emerald-400 font-medium">Logged in as: {user.username}</span>
-            <button
-              onClick={() => { setUser(null); setCurrentGameId(null); setGame(null); }}
-              className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700"
-            >
-              Sign Out
-            </button>
+            {user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-emerald-400 font-medium">Logged in as: {user.username}</span>
+                <button
+                  onClick={() => setUser(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-1.5 rounded-lg text-xs font-semibold transition border border-slate-700"
+                >
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <span className="text-xs bg-amber-950/80 border border-amber-800/50 text-amber-300 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium">
+                <Eye className="w-3.5 h-3.5" /> Visitor / Spectator Mode
+              </span>
+            )}
           </div>
         </header>
 
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Control Panel */}
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-2xl p-6 shadow-2xl backdrop-blur-md flex flex-col justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-4">
-                <Play className="w-5 h-5" /> Launch Campaign
-              </h2>
+            {!user ? (
               <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">Home Nation</label>
-                  <select
-                    value={selectedHomeCountry}
-                    onChange={(e) => setSelectedHomeCountry(e.target.value)}
-                    className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 text-sm"
-                  >
-                    {WORLD_COUNTRIES.map((c) => (
-                      <option key={c.name} value={c.name}>{c.name} (Pop: {c.population})</option>
-                    ))}
-                  </select>
-                </div>
+                <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2">
+                  <Lock className="w-5 h-5" /> Player Access Control
+                </h2>
+                <p className="text-xs text-slate-400">
+                  As a visitor, you can spectate live games. Sign in or register below to launch campaigns and execute tactical orders.
+                </p>
 
-                <div>
-                  <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">AI Difficulty</label>
-                  <select
-                    value={difficulty}
-                    onChange={(e: any) => setDifficulty(e.target.value)}
-                    className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 text-xs"
-                  >
-                    <option value="easy">Easy (Weaker AI Garrisons)</option>
-                    <option value="medium">Medium (Balanced Strategy)</option>
-                    <option value="hard">Hard (Reinforced AI Defenses)</option>
-                  </select>
-                </div>
+                {authError && <div className="bg-red-950/50 border border-red-800 text-red-300 p-3 rounded-lg text-xs">{authError}</div>}
 
-                <button
-                  onClick={handleStartGame}
-                  disabled={loadingAction}
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-emerald-900/20 disabled:opacity-50 text-sm"
-                >
-                  {loadingAction ? "Setting up Database..." : "Start Conquest Campaign"}
-                </button>
+                <form onSubmit={handleAuth} className="space-y-3">
+                  {authMode === "register" && (
+                    <div>
+                      <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Username</label>
+                      <input
+                        type="text"
+                        required
+                        value={authForm.username}
+                        onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })}
+                        className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                        placeholder="Commander name"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={authForm.email}
+                      onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                      className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      placeholder="commander@domain.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-slate-400 uppercase tracking-wider mb-1">Password</label>
+                    <input
+                      type="password"
+                      required
+                      value={authForm.password}
+                      onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                      className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-2.5 rounded-lg transition text-xs"
+                  >
+                    {authMode === "login" ? "Sign In to Play" : "Register Account"}
+                  </button>
+                </form>
+
+                <div className="text-center pt-2">
+                  <button
+                    onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setAuthError(""); }}
+                    className="text-[11px] text-amber-400 hover:underline"
+                  >
+                    {authMode === "login" ? "Don't have an account? Register" : "Already have an account? Sign In"}
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <h2 className="text-lg font-bold text-amber-400 flex items-center gap-2 mb-4">
+                  <Play className="w-5 h-5" /> Launch Campaign
+                </h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">Home Nation</label>
+                    <select
+                      value={selectedHomeCountry}
+                      onChange={(e) => setSelectedHomeCountry(e.target.value)}
+                      className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-amber-500 text-sm"
+                    >
+                      {WORLD_COUNTRIES.map((c) => (
+                        <option key={c.name} value={c.name}>{c.name} (Pop: {c.population})</option>
+                      ))}
+                    </select>
+                  </div>
 
-            {currentGameId && game && (
+                  <div>
+                    <label className="block text-xs text-slate-400 uppercase tracking-wider mb-2">AI Difficulty</label>
+                    <select
+                      value={difficulty}
+                      onChange={(e: any) => setDifficulty(e.target.value)}
+                      className="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-4 py-2.5 text-slate-100 focus:outline-none focus:border-amber-500 text-xs"
+                    >
+                      <option value="easy">Easy (Weaker AI Garrisons)</option>
+                      <option value="medium">Medium (Balanced Strategy)</option>
+                      <option value="hard">Hard (Reinforced AI Defenses)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={handleStartGame}
+                    disabled={loadingAction}
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-xl transition shadow-lg shadow-emerald-900/20 disabled:opacity-50 text-sm"
+                  >
+                    {loadingAction ? "Setting up Database..." : "Start Conquest Campaign"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {currentGameId && game && user && (
               <div className="mt-8 pt-6 border-t border-slate-800/80 space-y-4">
                 <h3 className="text-sm font-semibold text-slate-300">Strategic Command Orders</h3>
                 
@@ -380,7 +387,7 @@ export default function GameDashboard() {
                   <Shield className="w-16 h-16 text-slate-700 mb-4 animate-pulse" />
                   <h3 className="text-xl font-bold text-slate-300 mb-1">No Active Campaign</h3>
                   <p className="text-sm text-slate-500 max-w-sm">
-                    Select your home country on the left and start your campaign to command territorial conquests.
+                    {user ? "Select your home country on the left and start your campaign." : "Log in or register on the left to start commanding conquests."}
                   </p>
                 </div>
               ) : (
@@ -417,17 +424,18 @@ export default function GameDashboard() {
                             </span>
                           </div>
                           <p className="text-xs text-slate-400">Garrison Strength: <span className="text-amber-400 font-bold">{t.strength}</span></p>
+                          {t.profile && <p className="text-[10px] text-slate-500 mt-1 italic">NPC Strategy: {t.profile}</p>}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Strategic Feed */}
+                  {/* NPC Decisions & Battle Feed */}
                   <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-xl">
                     <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-amber-500" /> AI Battle Commentary & Feed
+                      <Trophy className="w-4 h-4 text-amber-500" /> NPC Decisions & Battle Justifications
                     </h4>
-                    <div className="space-y-1.5 max-h-32 overflow-y-auto text-xs text-slate-300">
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto text-xs text-slate-300">
                       {game.logs?.map((log: any, idx: number) => (
                         <p key={idx} className="border-l-2 border-amber-500/50 pl-2 py-0.5">• {log.message}</p>
                       ))}
@@ -444,12 +452,14 @@ export default function GameDashboard() {
                   <p className="text-slate-300 text-sm max-w-md mb-6">
                     Congratulations Commander! You have conquered all rival territories and established total hegemony in Turn {game.turn} with {game.resources?.gold} Gold.
                   </p>
-                  <button
-                    onClick={handleStartGame}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-emerald-900/40"
-                  >
-                    Launch New Global Conquest
-                  </button>
+                  {user && (
+                    <button
+                      onClick={handleStartGame}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-6 py-3 rounded-xl transition shadow-lg shadow-emerald-900/40"
+                    >
+                      Launch New Global Conquest
+                    </button>
+                  )}
                 </div>
               )}
             </div>

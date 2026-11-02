@@ -58,9 +58,9 @@ export async function GET(
       },
       territories: game.territories || [
         { id: "t1", name: game.home_country, owner: "player", strength: 180 },
-        { id: "t2", name: "Neighboring Rival Alpha", owner: "AI", strength: 100 },
-        { id: "t3", name: "Strategic Oil Fields", owner: "Neutral", strength: 70 },
-        { id: "t4", name: "Western Wasteland", owner: "AI", strength: 130 },
+        { id: "t2", name: "Neighboring Rival Alpha", owner: "AI", strength: 100, profile: "Aggressive Expansionist" },
+        { id: "t3", name: "Strategic Oil Fields", owner: "Neutral", strength: 70, profile: "Neutral Guard" },
+        { id: "t4", name: "Western Wasteland", owner: "AI", strength: 130, profile: "Defensive Turtler" },
       ],
       logs: game.logs || [
         { message: `Campaign successfully launched for ${game.home_country}. Global conquest initiated.` }
@@ -103,13 +103,14 @@ export async function POST(
 
     let territories = game.territories || [
       { id: "t1", name: game.home_country, owner: "player", strength: 180 },
-      { id: "t2", name: "Neighboring Rival Alpha", owner: "AI", strength: 100 },
-      { id: "t3", name: "Strategic Oil Fields", owner: "Neutral", strength: 70 },
-      { id: "t4", name: "Western Wasteland", owner: "AI", strength: 130 },
+      { id: "t2", name: "Neighboring Rival Alpha", owner: "AI", strength: 100, profile: "Aggressive Expansionist" },
+      { id: "t3", name: "Strategic Oil Fields", owner: "Neutral", strength: 70, profile: "Neutral Guard" },
+      { id: "t4", name: "Western Wasteland", owner: "AI", strength: 130, profile: "Defensive Turtler" },
     ];
 
     let logs = game.logs || [];
 
+    // Player Turn Action
     if (action === "ATTACK" && fromCountryId && toCountryId) {
       const attacker = territories.find((t: any) => t.id === fromCountryId);
       const defender = territories.find((t: any) => t.id === toCountryId);
@@ -121,21 +122,37 @@ export async function POST(
           defender.owner = "player";
           defender.strength = Math.max(100, Math.floor(attacker.strength * 0.8));
           gold += 350;
-          logs.unshift({ message: `🏆 VICTORY! ${attacker.name} successfully conquered ${defender.name}! Acquired +350 Gold.` });
+          logs.unshift({ message: `🏆 PLAYER VICTORY: ${attacker.name} conquered ${defender.name}! Acquired +350 Gold.` });
         } else {
           attacker.strength = Math.max(20, attacker.strength - 30);
-          logs.unshift({ message: `❌ DEFEAT: Assault on ${defender.name} was repelled by enemy defenses.` });
+          logs.unshift({ message: `❌ PLAYER DEFEAT: Assault on ${defender.name} was repelled by enemy defenses.` });
         }
       }
     } else if (action === "SKIP") {
-      logs.unshift({ message: `Turn ${turn}: Consolidated regional defenses, reinforced garrisons, and gathered economic yields.` });
+      logs.unshift({ message: `Turn ${turn}: Commander consolidated regional defenses and gathered economic yields.` });
     }
 
-    // Check Victory Condition: Are ALL territories owned by player?
+    // NPC AI Turn Execution & Justification Log
+    const aiTerritories = territories.filter((t: any) => t.owner === "AI");
+    aiTerritories.forEach((aiTerritory: any) => {
+      if (aiTerritory.profile === "Aggressive Expansionist") {
+        aiTerritory.strength += 25;
+        logs.unshift({
+          message: `🤖 NPC DECISION (${aiTerritory.name}): Reinforced garrison (+25 strength). [Justification: High aggression profile prioritizes forward offensive readiness].`
+        });
+      } else if (aiTerritory.profile === "Defensive Turtler") {
+        aiTerritory.strength += 35;
+        logs.unshift({
+          message: `🤖 NPC DECISION (${aiTerritory.name}): Fortified borders (+35 strength). [Justification: Defensive profile fortifies base to prevent player encirclement].`
+        });
+      }
+    });
+
+    // Check Global Victory Condition
     const allConquered = territories.every((t: any) => t.owner === "player");
     if (allConquered) {
       status = "completed";
-      logs.unshift({ message: `👑 GLOBAL DOMINATION ACHIEVED! All territories have been unified under your nation's banner!` });
+      logs.unshift({ message: `👑 GLOBAL DOMINATION ACHIEVED! All territories unified under your banner!` });
     }
 
     const territoriesJson = JSON.stringify(territories);
@@ -165,7 +182,6 @@ export async function POST(
       }
     }, { status: 200 });
   } catch (error: any) {
-    console.error("POST /api/games/[id] error:", error);
     return NextResponse.json({ message: error.message || "Failed to execute action" }, { status: 500 });
   }
 }
